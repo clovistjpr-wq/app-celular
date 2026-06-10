@@ -1,1 +1,97 @@
 
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Extrator PDF (Linhas 30 a 60)</title>
+    <style>
+        body { 
+            font-family: Arial, sans-serif; 
+            padding: 15px; 
+            background: #f0f0f0; 
+            max-width: 800px; 
+            margin: 0 auto; 
+        }
+        .box { 
+            background: white; 
+            padding: 20px; 
+            border-radius: 8px; 
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1); 
+            text-align: center; 
+            margin-bottom: 20px;
+        }
+        input[type="file"] { 
+            margin: 15px 0; 
+            padding: 10px;
+            background: #e9e9e9;
+            border-radius: 4px;
+            width: 90%;
+        }
+        .status { 
+            color: #666; 
+            font-style: italic; 
+            margin-top: 10px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            background: white;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-top: 20px;
+        }
+        th, td {
+            padding: 12px 15px;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+        }
+        th {
+            background-color: #dc3545; /* Cor vermelha para identificar a nova versão */
+            color: white;
+            font-weight: bold;
+        }
+        tr:hover {
+            background-color: #f5f5f5;
+        }
+        .container-tabela {
+            overflow-x: auto;
+        }
+        #preview-texto {
+            background: #222;
+            color: #00ff00;
+            padding: 15px;
+            border-radius: 8px;
+            font-family: monospace;
+            font-size: 12px;
+            max-height: 300px;
+            overflow-y: auto;
+            margin-top: 20px;
+            white-space: pre-wrap;
+            text-align: left;
+        }
+    </style>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+</head>
+<body>
+
+    <div class="box">
+        <h1>Extrator Filtrado (Linhas 30 a 60)</h1>
+        <p>Gera a tabela analisando estritamente o intervalo definido:</p>
+        
+        <input type="file" id="pdf-input">
+        <div id="status" class="status"></div>
+    </div>
+
+    <div class="container-tabela" id="resultado-tabela" style="display: none;">
+        <table>
+            <thead>
+                <tr>
+                    <th>Tipo / Papel</th>
+                    <th>Nome Encontrado</th>
+                    <th>RG</th>
+                </tr>
+            </thead>
+            <tbody id="corpo-tabela
