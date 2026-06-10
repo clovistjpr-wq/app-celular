@@ -3,26 +3,84 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Meu PWA Local</title>
-    <!-- Link para o Manifest -->
+    <title>Leitor de PDF Offline</title>
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#007bff">
     <style>
-        body { font-family: Arial, sans-serif; text-align: center; padding-top: 50px; background: #f0f0f0; }
-        button { padding: 15px 30px; font-size: 18px; border-radius: 8px; border: none; background: #007bff; color: white; }
+        body { font-family: Arial, sans-serif; padding: 20px; background: #f0f0f0; max-width: 600px; margin: 0 auto; }
+        .box { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); text-align: center; }
+        input[type="file"] { margin: 20px 0; }
+        #resultado { background: #e9e9e9; padding: 15px; border-radius: 5px; text-align: left; white-space: pre-wrap; max-height: 400px; overflow-y: auto; margin-top: 20px; font-size: 14px; }
+        .status { color: #666; font-style: italic; }
     </style>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 </head>
 <body>
 
-    <h1>Meu Primeiro PWA</h1>
-    <p>Este app roda offline!</p>
-    <button onclick="alert('Funciona!')">Testar</button>
+    <div class="box">
+        <h1>Conversor de PDF para Texto</h1>
+        <p>Selecione um arquivo PDF do seu celular:</p>
+        
+        <input type="file" id="pdf-input" accept=".pdf">
+        <div id="status" class="status"></div>
+    </div>
+
+    <div id="resultado" style="display: none;"></div>
 
     <script>
-        // Registra o Service Worker para permitir funcionamento offline
+        // Configura o worker do PDF.js obrigatório para o funcionamento
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+        document.getElementById('pdf-input').addEventListener('change', async (event) => {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const statusDiv = document.getElementById('status');
+            const resultadoDiv = document.getElementById('resultado');
+            
+            statusDiv.innerText = "Processando PDF... aguarde.";
+            resultadoDiv.style.display = "none";
+            resultadoDiv.innerText = "";
+
+            try {
+                // Ler o arquivo do celular como ArrayBuffer
+                const fileReader = new FileReader();
+                fileReader.onload = async function () {
+                    const typedarray = new Uint8Array(this.result);
+                    
+                    // Carrega o documento PDF
+                    const pdf = await pdfjsLib.getDocument(typedarray).promise;
+                    let textoCompleto = "";
+
+                    // Passa por cada página do PDF extraindo o texto
+                    for (let i = 1; i <= pdf.numPages; i++) {
+                        const page = await pdf.getPage(i);
+                        const textContent = await page.getTextContent();
+                        
+                        // Junta as palavras da página
+                        const textoPagina = textContent.items.map(item => item.str).join(" ");
+                        textoCompleto += `--- Página ${i} ---\n${textoPagina}\n\n`;
+                    }
+
+                    // Exibe o resultado na tela
+                    statusDiv.innerText = "Concluído com sucesso!";
+                    resultadoDiv.innerText = textoCompleto;
+                    resultadoDiv.style.display = "block";
+                };
+                
+                fileReader.readAsArrayBuffer(file);
+
+            } catch (erro) {
+                console.error(erro);
+                statusDiv.innerText = "Erro ao ler o PDF. Certifique-se de que não é uma imagem scanneada.";
+            }
+        });
+
+        // Registro do Service Worker para o PWA
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.register('sw.js')
-                .then(() => console.log("Service Worker Registrado!"));
+                .then(() => console.log("Service Worker ativo!"));
         }
     </script>
 </body>
