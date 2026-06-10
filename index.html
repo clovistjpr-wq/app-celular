@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Extrator PDF (Linhas 15 a 30)</title>
+    <title>Extrator PDF Direto (15 a 30)</title>
     <style>
         body { 
             font-family: Arial, sans-serif; 
@@ -47,7 +47,7 @@
             border-bottom: 1px solid #ddd;
         }
         th {
-            background-color: #007bff;
+            background-color: #28a745;
             color: white;
             font-weight: bold;
         }
@@ -72,16 +72,16 @@
         }
     </style>
 
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
+    <script src="https://unpkg.com/pdfjs-dist@2.16.105/build/pdf.min.js"></script>
 </head>
 <body>
 
     <div class="box">
         <h1>Extrator de PDF (Linhas 15 a 30)</h1>
-        <p>Busca Vítimas, Testemunhas e RGs apenas no intervalo selecionado:</p>
+        <p>Busca estruturada de dados sem bloqueios locais:</p>
         
         <input type="file" id="pdf-input">
-        <div id="status" class="status">Carregando sistema...</div>
+        <div id="status" class="status">Iniciando engrenagens...</div>
     </div>
 
     <div class="container-tabela" id="resultado-tabela" style="display: none;">
@@ -103,20 +103,15 @@
     </div>
 
     <script>
-        // Criação dinâmica do Worker para evitar bloqueios de segurança (CORS)
-        window.onload = function() {
-            try {
-                const workerCode = `
-                    importScripts('https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js');
-                `;
-                const blob = new Blob([workerCode], {type: 'application/javascript'});
-                pdfjsLib.GlobalWorkerOptions.workerSrc = URL.createObjectURL(blob);
-                document.getElementById('status').innerText = "Sistema pronto e desbloqueado!";
-            } catch(e) {
-                pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';
-                document.getElementById('status').innerText = "Sistema pronto (modo de compatibilidade).";
-            }
-        };
+        // Configuração direta simplificada para não travar no carregamento inicial
+        try {
+            pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://unpkg.com/pdfjs-dist@2.16.105/build/pdf.worker.min.js';
+            window.addEventListener('DOMContentLoaded', () => {
+                document.getElementById('status').innerText = "Sistema pronto! Selecione o arquivo.";
+            });
+        } catch(e) {
+            console.log("Erro inicial evitado.");
+        }
 
         document.getElementById('pdf-input').addEventListener('change', async (event) => {
             const file = event.target.files[0];
@@ -128,82 +123,4 @@
             const previewContainer = document.getElementById('preview-container');
             const previewTexto = document.getElementById('preview-texto');
             
-            statusDiv.innerHTML = "<span style='color:#e67e22;'>Organizando linhas gráficas...</span>";
-            tabelaDiv.style.display = "none";
-            previewContainer.style.display = "none";
-            corpoTabela.innerHTML = ""; 
-
-            try {
-                const fileReader = new FileReader();
-                fileReader.onload = async function () {
-                    try {
-                        const typedarray = new Uint8Array(this.result);
-                        const loadingTask = pdfjsLib.getDocument({data: typedarray});
-                        const pdf = await loadingTask.promise;
-                        
-                        const page = await pdf.getPage(1);
-                        const textContent = await page.getTextContent();
-                        
-                        let blocosDeTexto = [];
-                        
-                        textContent.items.forEach(item => {
-                            blocosDeTexto.push({
-                                texto: item.str,
-                                x: item.transform[4],
-                                y: Math.round(item.transform[5])
-                            });
-                        });
-
-                        // Elimina quebras fantasmas agrupando pela coordenada Y
-                        let linhasAgrupadas = {};
-                        blocosDeTexto.forEach(bloco => {
-                            if (!linhasAgrupadas[bloco.y]) {
-                                linhasAgrupadas[bloco.y] = [];
-                            }
-                            linhasAgrupadas[bloco.y].push(bloco);
-                        });
-
-                        let alturasOrdenadas = Object.keys(linhasAgrupadas).sort((a, b) => b - a);
-
-                        let arrayLinhasFinais = [];
-                        alturasOrdenadas.forEach(y => {
-                            let pedacosDaLinha = linhasAgrupadas[y];
-                            pedacosDaLinha.sort((a, b) => a.x - b.x); // Ordena da esquerda para a direita (X)
-                            
-                            let linhaCompleta = pedacosDaLinha.map(p => p.texto).join(" ").replace(/\s+/g, ' ');
-                            if (linhaCompleta.trim().length > 0) {
-                                arrayLinhasFinais.push(linhaCompleta);
-                            }
-                        });
-
-                        // --- RECORTE DAS LINHAS 15 A 30 ---
-                        // Índice 14 representa a linha 15. O número 30 marca o limite final.
-                        const linhasFiltradas = arrayLinhasFinais.slice(14, 30);
-                        const textoFinalFiltrado = linhasFiltradas.join("\n");
-
-                        // Mostra o texto capturado no painel preto/verde
-                        previewTexto.innerText = textoFinalFiltrado;
-                        previewContainer.style.display = "block";
-
-                        // Faz a varredura de dados apenas no texto recortado
-                        processarTextoEPreecherTabela(textoFinalFiltrado);
-                    } catch (errInner) {
-                        console.error(errInner);
-                        statusDiv.innerHTML = "<span style='color:red;'>Erro ao ler estrutura do PDF.</span>";
-                    }
-                };
-                
-                fileReader.readAsArrayBuffer(file);
-
-            } catch (erro) {
-                console.error(erro);
-                statusDiv.innerHTML = "<span style='color:red;'>Falha ao carregar o arquivo.</span>";
-            }
-        });
-
-        function processarTextoEPreecherTabela(texto) {
-            const statusDiv = document.getElementById('status');
-            const tabelaDiv = document.getElementById('resultado-tabela');
-            const corpoTabela = document.getElementById('corpo-tabela');
-
-            const padroes =
+            statusDiv.innerHTML = "<span style='color:#e67e22;'>Lendo e organizando linhas estruturadas...</span>";
