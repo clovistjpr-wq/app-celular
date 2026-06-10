@@ -1,10 +1,9 @@
-
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Extrator PDF (Linhas 30 a 60)</title>
+    <title>Extrator PDF Estabilizado (30 a 60)</title>
     <style>
         body { 
             font-family: Arial, sans-serif; 
@@ -29,8 +28,8 @@
             width: 90%;
         }
         .status { 
-            color: #666; 
-            font-style: italic; 
+            color: #0056b3; 
+            font-weight: bold;
             margin-top: 10px;
         }
         table {
@@ -48,7 +47,7 @@
             border-bottom: 1px solid #ddd;
         }
         th {
-            background-color: #dc3545; /* Cor vermelha para identificar a nova versão */
+            background-color: #721c24;
             color: white;
             font-weight: bold;
         }
@@ -59,8 +58,8 @@
             overflow-x: auto;
         }
         #preview-texto {
-            background: #222;
-            color: #00ff00;
+            background: #1e1e1e;
+            color: #39ff14;
             padding: 15px;
             border-radius: 8px;
             font-family: monospace;
@@ -73,16 +72,16 @@
         }
     </style>
 
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
 </head>
 <body>
 
     <div class="box">
-        <h1>Extrator Filtrado (Linhas 30 a 60)</h1>
-        <p>Gera a tabela analisando estritamente o intervalo definido:</p>
+        <h1>Extrator Filtrado Corrigido (30 a 60)</h1>
+        <p>Selecione o PDF para processamento em servidor estável:</p>
         
         <input type="file" id="pdf-input">
-        <div id="status" class="status"></div>
+        <div id="status" class="status">Aguardando arquivo...</div>
     </div>
 
     <div class="container-tabela" id="resultado-tabela" style="display: none;">
@@ -94,4 +93,162 @@
                     <th>RG</th>
                 </tr>
             </thead>
-            <tbody id="corpo-tabela
+            <tbody id="corpo-tabela"></tbody>
+        </table>
+    </div>
+
+    <div id="preview-container" style="display: none;">
+        <p style="margin-top:20px; font-weight:bold;">Linhas Extraídas (Intervalo 30 a 60):</p>
+        <div id="preview-texto"></div>
+    </div>
+
+    <script>
+        // Aponta o Worker para a mesma versão estável externa com segurança
+        window.onload = function() {
+            try {
+                pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';
+                document.getElementById('status').innerText = "Sistema pronto para uso.";
+            } catch(e) {
+                document.getElementById('status').innerHTML = "<span style='color:red;'>Erro ao carregar os módulos de segurança do PDF. Atualize a página.</span>";
+            }
+        };
+
+        document.getElementById('pdf-input').addEventListener('change', async (event) => {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const statusDiv = document.getElementById('status');
+            const tabelaDiv = document.getElementById('resultado-tabela');
+            const corpoTabela = document.getElementById('corpo-tabela');
+            const previewContainer = document.getElementById('preview-container');
+            const previewTexto = document.getElementById('preview-texto');
+            
+            statusDiv.innerHTML = "<span style='color:#e67e22;'>Processando coordenadas e alinhando texto...</span>";
+            tabelaDiv.style.display = "none";
+            previewContainer.style.display = "none";
+            corpoTabela.innerHTML = ""; 
+
+            try {
+                const fileReader = new FileReader();
+                fileReader.onload = async function () {
+                    try {
+                        const typedarray = new Uint8Array(this.result);
+                        
+                        // Método estável de carregamento
+                        const loadingTask = pdfjsLib.getDocument({data: typedarray});
+                        const pdf = await loadingTask.promise;
+                        
+                        const page = await pdf.getPage(1);
+                        const textContent = await page.getTextContent();
+                        
+                        let blocosDeTexto = [];
+                        
+                        textContent.items.forEach(item => {
+                            blocosDeTexto.push({
+                                texto: item.str,
+                                x: item.transform[4],
+                                y: Math.round(item.transform[5])
+                            });
+                        });
+
+                        let linhasAgrupadas = {};
+                        blocosDeTexto.forEach(bloco => {
+                            if (!linhasAgrupadas[bloco.y]) {
+                                linhasAgrupadas[bloco.y] = [];
+                            }
+                            linhasAgrupadas[bloco.y].push(bloco);
+                        });
+
+                        let alturasOrdenadas = Object.keys(linhasAgrupadas).sort((a, b) => b - a);
+
+                        let arrayLinhasFinais = [];
+                        alturasOrdenadas.forEach(y => {
+                            let pedacosDaLinha = linhasAgrupadas[y];
+                            pedacosDaLinha.sort((a, b) => a.x - b.x);
+                            
+                            let linhaCompleta = pedacosDaLinha.map(p => p.texto).join(" ").replace(/\s+/g, ' ');
+                            if (linhaCompleta.trim().length > 0) {
+                                arrayLinhasFinais.push(linhaCompleta);
+                            }
+                        });
+
+                        // Intervalo estrito: Linha 30 a 60
+                        const linhasFiltradas = arrayLinhasFinais.slice(29, 60);
+                        const textoFinalFiltrado = linhasFiltradas.join("\n");
+
+                        previewTexto.innerText = textoFinalFiltrado;
+                        previewContainer.style.display = "block";
+
+                        processarTextoEPreecherTabela(textoFinalFiltrado);
+                    } catch (errInner) {
+                        console.error(errInner);
+                        statusDiv.innerHTML = "<span style='color:red;'>Erro interno na leitura dos dados binários do PDF.</span>";
+                    }
+                };
+                
+                fileReader.readAsArrayBuffer(file);
+
+            } catch (erro) {
+                console.error(erro);
+                statusDiv.innerHTML = "<span style='color:red;'>Falha de comunicação com o arquivo selecionado.</span>";
+            }
+        });
+
+        function processarTextoEPreecherTabela(texto) {
+            const statusDiv = document.getElementById('status');
+            const tabelaDiv = document.getElementById('resultado-tabela');
+            const corpoTabela = document.getElementById('corpo-tabela');
+
+            const padroes = [
+                { tipo: 'Vítima', regex: /(?:vítima|vitima)[:\s-]([^,\n]{3,40})/gi },
+                { tipo: 'Testemunha', regex: /(?:testemunha)[:\s-]([^,\n]{3,40})/gi },
+                { tipo: 'Nome', regex: /(?:nome)[:\s-]([^,\n]{3,40})/gi }
+            ];
+
+            let dadosEncontrados = [];
+            let rgsEncontrados = [];
+
+            let matchRG;
+            const regexRG = /(?:rg|r\.g\.)[:\s-]*([0-9X\s.-]{5,15})/gi;
+            while ((matchRG = regexRG.exec(texto)) !== null) {
+                rgsEncontrados.push(matchRG[1].trim());
+            }
+
+            padroes.forEach(padrao => {
+                let match;
+                padrao.regex.lastIndex = 0; 
+                while ((match = padrao.regex.exec(texto)) !== null) {
+                    dadosEncontrados.push({
+                        tipo: padrao.tipo,
+                        nome: match[1].trim()
+                    });
+                }
+            });
+
+            if (dadosEncontrados.length === 0 && rgsEncontrados.length === 0) {
+                statusDiv.innerHTML = "<span style='color:#e67e22;'>Filtro aplicado, porém nenhum Nome/RG está entre as linhas 30 e 60.</span>";
+                return;
+            }
+
+            const totalLinhas = Math.max(dadosEncontrados.length, rgsEncontrados.length);
+
+            for (let i = 0; i < totalLinhas; i++) {
+                const pessoa = dadosEncontrados[i] || { tipo: 'Não identificado', nome: '-' };
+                const rg = rgsEncontrados[i] || '-';
+
+                const linha = `
+                    <tr>
+                        <td><strong>${pessoa.tipo}</strong></td>
+                        <td>${pessoa.nome}</td>
+                        <td>${rg}</td>
+                    </tr>
+                `;
+                corpoTabela.innerHTML += linha;
+            }
+
+            statusDiv.innerHTML = "<span style='color:green;'>Tabela estruturada com sucesso!</span>";
+            tabelaDiv.style.display = "block";
+        }
+    </script>
+</body>
+</html>
