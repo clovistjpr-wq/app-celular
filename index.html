@@ -1,1 +1,116 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Leitor de PDF Offline</title>
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#007bff">
+    <style>
+        body { 
+            font-family: Arial, sans-serif; 
+            padding: 20px; 
+            background: #f0f0f0; 
+            max-width: 600px; 
+            margin: 0 auto; 
+        }
+        .box { 
+            background: white; 
+            padding: 20px; 
+            border-radius: 8px; 
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1); 
+            text-align: center; 
+        }
+        input[type="file"] { 
+            margin: 20px 0; 
+            padding: 10px;
+            background: #e9e9e9;
+            border-radius: 4px;
+            width: 80%;
+        }
+        #resultado { 
+            background: white; 
+            padding: 15px; 
+            border-radius: 8px; 
+            text-align: left; 
+            white-space: pre-wrap; 
+            max-height: 400px; 
+            overflow-y: auto; 
+            margin-top: 20px; 
+            font-size: 14px; 
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .status { 
+            color: #666; 
+            font-style: italic; 
+            margin-top: 10px;
+        }
+    </style>
 
+    <!-- Carrega a biblioteca PDF.js da Mozilla -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+</head>
+<body>
+
+    <div class="box">
+        <h1>Conversor de PDF para Texto</h1>
+        <p>Clique abaixo para buscar o PDF no seu celular:</p>
+        
+        <!-- Botão universal simplificado para evitar abrir a câmera -->
+        <input type="file" id="pdf-input">
+        <div id="status" class="status"></div>
+    </div>
+
+    <div id="resultado" style="display: none;"></div>
+
+    <script>
+        // Configura o worker do PDF.js obrigatório para o funcionamento
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+        document.getElementById('pdf-input').addEventListener('change', async (event) => {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const statusDiv = document.getElementById('status');
+            const resultadoDiv = document.getElementById('resultado');
+            
+            statusDiv.innerText = "Processando PDF... aguarde.";
+            resultadoDiv.style.display = "none";
+            resultadoDiv.innerText = "";
+
+            try {
+                // Ler o arquivo do celular como ArrayBuffer
+                const fileReader = new FileReader();
+                fileReader.onload = async function () {
+                    const typedarray = new Uint8Array(this.result);
+                    
+                    // Carrega o documento PDF
+                    const pdf = await pdfjsLib.getDocument(typedarray).promise;
+                    let textoCompleto = "";
+
+                    // Passa por cada página do PDF extraindo o texto
+                    for (let i = 1; i <= pdf.numPages; i++) {
+                        const page = await pdf.getPage(i);
+                        const textContent = await page.getTextContent();
+                        
+                        // Junta as palavras da página
+                        const textoPagina = textContent.items.map(item => item.str).join(" ");
+                        textoCompleto += `--- Página ${i} ---\n${textoPagina}\n\n`;
+                    }
+
+                    // Exibe o resultado na tela
+                    statusDiv.innerText = "Concluído com sucesso!";
+                    resultadoDiv.innerText = textoCompleto;
+                    resultadoDiv.style.display = "block";
+                };
+                
+                fileReader.readAsArrayBuffer(file);
+
+            } catch (erro) {
+                console.error(erro);
+                statusDiv.innerText = "Erro ao ler o PDF. Certifique-se de que não é uma imagem digitalizada.";
+            }
+        });
+    </script>
+</body>
+</html>
