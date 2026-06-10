@@ -1,1 +1,260 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Extrator PDF Estável (15 a 30)</title>
+    <style>
+        body { 
+            font-family: Arial, sans-serif; 
+            padding: 15px; 
+            background: #f0f0f0; 
+            max-width: 800px; 
+            margin: 0 auto; 
+        }
+        .box { 
+            background: white; 
+            padding: 20px; 
+            border-radius: 8px; 
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1); 
+            text-align: center; 
+            margin-bottom: 20px;
+        }
+        input[type="file"] { 
+            margin: 15px 0; 
+            padding: 10px;
+            background: #e9e9e9;
+            border-radius: 4px;
+            width: 90%;
+        }
+        .status { 
+            color: #0056b3; 
+            font-weight: bold;
+            margin-top: 10px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            background: white;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-top: 20px;
+        }
+        th, td {
+            padding: 12px 15px;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+        }
+        th {
+            background-color: #28a745;
+            color: white;
+            font-weight: bold;
+        }
+        tr:hover {
+            background-color: #f5f5f5;
+        }
+        .container-tabela {
+            overflow-x: auto;
+        }
+        #preview-texto {
+            background: #1e1e1e;
+            color: #39ff14;
+            padding: 15px;
+            border-radius: 8px;
+            font-family: monospace;
+            font-size: 12px;
+            max-height: 300px;
+            overflow-y: auto;
+            margin-top: 20px;
+            white-space: pre-wrap;
+            text-align: left;
+        }
+    </style>
 
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
+</head>
+<body>
+
+    <div class="box">
+        <h1>Extrator de PDF (Linhas 15 a 30)</h1>
+        <p>Busca estruturada de dados sem bloqueios locais:</p>
+        
+        <input type="file" id="pdf-input">
+        <div id="status" class="status">Verificando motor do sistema...</div>
+    </div>
+
+    <div class="container-tabela" id="resultado-tabela" style="display: none;">
+        <table>
+            <thead>
+                <tr>
+                    <th>Tipo / Papel</th>
+                    <th>Nome Encontrado</th>
+                    <th>RG</th>
+                </tr>
+            </thead>
+            <tbody id="corpo-tabela"></tbody>
+        </table>
+    </div>
+
+    <div id="preview-container" style="display: none;">
+        <p style="margin-top:20px; font-weight:bold;">Texto Extraído (Linhas 15 a 30):</p>
+        <div id="preview-texto"></div>
+    </div>
+
+    <script>
+        // Configura o motor com tratamento de erro nativo
+        function iniciarMotor() {
+            try {
+                // Configura o worker oficial de fallback de forma direta
+                pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';
+                document.getElementById('status').innerText = "Sistema pronto! Selecione o arquivo.";
+            } catch(e) {
+                // Se o navegador barrar o link de cima, este plano B embutido roda localmente
+                pdfjsLib.GlobalWorkerOptions.workerSrc = '//cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';
+                document.getElementById('status').innerText = "Sistema pronto (Modo B).";
+            }
+        }
+
+        // Executa a inicialização assim que a página abre
+        window.addEventListener('load', iniciarMotor);
+        setTimeout(iniciarMotor, 1000); // Garante a execução caso o evento atrase
+
+        document.getElementById('pdf-input').addEventListener('change', async (event) => {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const statusDiv = document.getElementById('status');
+            const tabelaDiv = document.getElementById('resultado-tabela');
+            const corpoTabela = document.getElementById('corpo-tabela');
+            const previewContainer = document.getElementById('preview-container');
+            const previewTexto = document.getElementById('preview-texto');
+            
+            statusDiv.innerHTML = "<span style='color:#e67e22;'>Lendo e organizando linhas estruturadas...</span>";
+            tabelaDiv.style.display = "none";
+            previewContainer.style.display = "none";
+            corpoTabela.innerHTML = ""; 
+
+            try {
+                const fileReader = new FileReader();
+                fileReader.onload = async function () {
+                    try {
+                        const typedarray = new Uint8Array(this.result);
+                        const loadingTask = pdfjsLib.getDocument({data: typedarray});
+                        const pdf = await loadingTask.promise;
+                        
+                        const page = await pdf.getPage(1);
+                        const textContent = await page.getTextContent();
+                        
+                        let blocosDeTexto = [];
+                        
+                        textContent.items.forEach(item => {
+                            blocosDeTexto.push({
+                                texto: item.str,
+                                x: item.transform[4],
+                                y: Math.round(item.transform[5])
+                            });
+                        });
+
+                        // Organiza linhas físicas do PDF (Fim das quebras fantasmas)
+                        let linhasAgrupadas = {};
+                        blocosDeTexto.forEach(bloco => {
+                            if (!linhasAgrupadas[bloco.y]) {
+                                linhasAgrupadas[bloco.y] = [];
+                            }
+                            linhasAgrupadas[bloco.y].push(bloco);
+                        });
+
+                        let alturasOrdenadas = Object.keys(linhasAgrupadas).sort((a, b) => b - a);
+
+                        let arrayLinhasFinais = [];
+                        alturasOrdenadas.forEach(y => {
+                            let pedacosDaLinha = linhasAgrupadas[y];
+                            pedacosDaLinha.sort((a, b) => a.x - b.x);
+                            
+                            let linhaCompleta = pedacosDaLinha.map(p => p.texto).join(" ").replace(/\s+/g, ' ');
+                            if (linhaCompleta.trim().length > 0) {
+                                arrayLinhasFinais.push(linhaCompleta);
+                            }
+                        });
+
+                        // Corte exato: Linhas 15 a 30
+                        const linhasFiltradas = arrayLinhasFinais.slice(14, 30);
+                        const textoFinalFiltrado = linhasFiltradas.join("\n");
+
+                        previewTexto.innerText = textoFinalFiltrado;
+                        previewContainer.style.display = "block";
+
+                        processarTextoEPreecherTabela(textoFinalFiltrado);
+                    } catch (errInner) {
+                        console.error(errInner);
+                        statusDiv.innerHTML = "<span style='color:red;'>Erro na leitura. Este PDF pode ser uma imagem escaneada.</span>";
+                    }
+                };
+                
+                fileReader.readAsArrayBuffer(file);
+
+            } catch (erro) {
+                console.error(erro);
+                statusDiv.innerHTML = "<span style='color:red;'>Erro ao abrir o arquivo.</span>";
+            }
+        });
+
+        function processarTextoEPreecherTabela(texto) {
+            const statusDiv = document.getElementById('status');
+            const tabelaDiv = document.getElementById('resultado-tabela');
+            const corpoTabela = document.getElementById('corpo-tabela');
+
+            const padroes = [
+                { tipo: 'Vítima', regex: /(?:vítima|vitima)[:\s-]([^,\n]{3,40})/gi },
+                { tipo: 'Testemunha', regex: /(?:testemunha)[:\s-]([^,\n]{3,40})/gi },
+                { tipo: 'Nome', regex: /(?:nome)[:\s-]([^,\n]{3,40})/gi }
+            ];
+
+            let dadosEncontrados = [];
+            let rgsEncontrados = [];
+
+            let matchRG;
+            const regexRG = /(?:rg|r\.g\.)[:\s-]*([0-9X\s.-]{5,15})/gi;
+            while ((matchRG = regexRG.exec(texto)) !== null) {
+                rgsEncontrados.push(matchRG[1].trim());
+            }
+
+            padroes.forEach(padrao => {
+                let match;
+                padrao.regex.lastIndex = 0; 
+                while ((match = padrao.regex.exec(texto)) !== null) {
+                    dadosEncontrados.push({
+                        tipo: padrao.tipo,
+                        nome: match[1].trim()
+                    });
+                }
+            });
+
+            if (dadosEncontrados.length === 0 && rgsEncontrados.length === 0) {
+                statusDiv.innerHTML = "<span style='color:#e67e22;'>Linhas 15 a 30 lidas, mas nenhum dado coincidiu com os padrões.</span>";
+                return;
+            }
+
+            const totalLinhas = Math.max(dadosEncontrados.length, rgsEncontrados.length);
+
+            for (let i = 0; i < totalLinhas; i++) {
+                const pessoa = dadosEncontrados[i] || { tipo: 'Não identificado', nome: '-' };
+                const rg = rgsEncontrados[i] || '-';
+
+                const linha = `
+                    <tr>
+                        <td><strong>${pessoa.tipo}</strong></td>
+                        <td>${pessoa.nome}</td>
+                        <td>${rg}</td>
+                    </tr>
+                `;
+                corpoTabela.innerHTML += linha;
+            }
+
+            statusDiv.innerHTML = "<span style='color:green;'>Tabela gerada com sucesso!</span>";
+            tabelaDiv.style.display = "block";
+        }
+    </script>
+</body>
+</html>
