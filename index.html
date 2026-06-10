@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Extrator PDF Blindado (30 a 60)</title>
+    <title>Extrator PDF (Linhas 15 a 30)</title>
     <style>
         body { 
             font-family: Arial, sans-serif; 
@@ -77,8 +77,8 @@
 <body>
 
     <div class="box">
-        <h1>Extrator de PDF Autônomo</h1>
-        <p>Analisa as linhas 30 a 60 sem bloqueios de segurança:</p>
+        <h1>Extrator de PDF (Linhas 15 a 30)</h1>
+        <p>Busca Vítimas, Testemunhas e RGs apenas no intervalo selecionado:</p>
         
         <input type="file" id="pdf-input">
         <div id="status" class="status">Carregando sistema...</div>
@@ -98,12 +98,12 @@
     </div>
 
     <div id="preview-container" style="display: none;">
-        <p style="margin-top:20px; font-weight:bold;">Linhas Extraídas (30 a 60):</p>
+        <p style="margin-top:20px; font-weight:bold;">Texto Extraído (Linhas 15 a 30):</p>
         <div id="preview-texto"></div>
     </div>
 
     <script>
-        // SOLUÇÃO DO BLOQUEIO: Criamos o Worker de forma embutida via código para o navegador não bloquear
+        // Criação dinâmica do Worker para evitar bloqueios de segurança (CORS)
         window.onload = function() {
             try {
                 const workerCode = `
@@ -113,7 +113,6 @@
                 pdfjsLib.GlobalWorkerOptions.workerSrc = URL.createObjectURL(blob);
                 document.getElementById('status').innerText = "Sistema pronto e desbloqueado!";
             } catch(e) {
-                // Caso falhe, usa o método alternativo inline direto
                 pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';
                 document.getElementById('status').innerText = "Sistema pronto (modo de compatibilidade).";
             }
@@ -129,7 +128,7 @@
             const previewContainer = document.getElementById('preview-container');
             const previewTexto = document.getElementById('preview-texto');
             
-            statusDiv.innerHTML = "<span style='color:#e67e22;'>Alinhando e processando linhas...</span>";
+            statusDiv.innerHTML = "<span style='color:#e67e22;'>Organizando linhas gráficas...</span>";
             tabelaDiv.style.display = "none";
             previewContainer.style.display = "none";
             corpoTabela.innerHTML = ""; 
@@ -155,6 +154,7 @@
                             });
                         });
 
+                        // Elimina quebras fantasmas agrupando pela coordenada Y
                         let linhasAgrupadas = {};
                         blocosDeTexto.forEach(bloco => {
                             if (!linhasAgrupadas[bloco.y]) {
@@ -168,7 +168,7 @@
                         let arrayLinhasFinais = [];
                         alturasOrdenadas.forEach(y => {
                             let pedacosDaLinha = linhasAgrupadas[y];
-                            pedacosDaLinha.sort((a, b) => a.x - b.x);
+                            pedacosDaLinha.sort((a, b) => a.x - b.x); // Ordena da esquerda para a direita (X)
                             
                             let linhaCompleta = pedacosDaLinha.map(p => p.texto).join(" ").replace(/\s+/g, ' ');
                             if (linhaCompleta.trim().length > 0) {
@@ -176,17 +176,20 @@
                             }
                         });
 
-                        // Intervalo: Linhas 30 a 60
-                        const linhasFiltradas = arrayLinhasFinais.slice(29, 60);
+                        // --- RECORTE DAS LINHAS 15 A 30 ---
+                        // Índice 14 representa a linha 15. O número 30 marca o limite final.
+                        const linhasFiltradas = arrayLinhasFinais.slice(14, 30);
                         const textoFinalFiltrado = linhasFiltradas.join("\n");
 
+                        // Mostra o texto capturado no painel preto/verde
                         previewTexto.innerText = textoFinalFiltrado;
                         previewContainer.style.display = "block";
 
+                        // Faz a varredura de dados apenas no texto recortado
                         processarTextoEPreecherTabela(textoFinalFiltrado);
                     } catch (errInner) {
                         console.error(errInner);
-                        statusDiv.innerHTML = "<span style='color:red;'>Erro ao descriptografar o PDF. Pode ser um arquivo digitalizado (imagem).</span>";
+                        statusDiv.innerHTML = "<span style='color:red;'>Erro ao ler estrutura do PDF.</span>";
                     }
                 };
                 
@@ -194,7 +197,7 @@
 
             } catch (erro) {
                 console.error(erro);
-                statusDiv.innerHTML = "<span style='color:red;'>Falha ao carregar arquivo.</span>";
+                statusDiv.innerHTML = "<span style='color:red;'>Falha ao carregar o arquivo.</span>";
             }
         });
 
@@ -203,56 +206,4 @@
             const tabelaDiv = document.getElementById('resultado-tabela');
             const corpoTabela = document.getElementById('corpo-tabela');
 
-            const padroes = [
-                { tipo: 'Vítima', regex: /(?:vítima|vitima)[:\s-]([^,\n]{3,40})/gi },
-                { tipo: 'Testemunha', regex: /(?:testemunha)[:\s-]([^,\n]{3,40})/gi },
-                { tipo: 'Nome', regex: /(?:nome)[:\s-]([^,\n]{3,40})/gi }
-            ];
-
-            let dadosEncontrados = [];
-            let rgsEncontrados = [];
-
-            let matchRG;
-            const regexRG = /(?:rg|r\.g\.)[:\s-]*([0-9X\s.-]{5,15})/gi;
-            while ((matchRG = regexRG.exec(texto)) !== null) {
-                rgsEncontrados.push(matchRG[1].trim());
-            }
-
-            padroes.forEach(padrao => {
-                let match;
-                padrao.regex.lastIndex = 0; 
-                while ((match = padrao.regex.exec(texto)) !== null) {
-                    dadosEncontrados.push({
-                        tipo: padrao.tipo,
-                        nome: match[1].trim()
-                    });
-                }
-            });
-
-            if (dadosEncontrados.length === 0 && rgsEncontrados.length === 0) {
-                statusDiv.innerHTML = "<span style='color:#e67e22;'>Leitura feita! Mas nenhum Nome ou RG consta entre as linhas 30 e 60.</span>";
-                return;
-            }
-
-            const totalLinhas = Math.max(dadosEncontrados.length, rgsEncontrados.length);
-
-            for (let i = 0; i < totalLinhas; i++) {
-                const pessoa = dadosEncontrados[i] || { tipo: 'Não identificado', nome: '-' };
-                const rg = rgsEncontrados[i] || '-';
-
-                const linha = `
-                    <tr>
-                        <td><strong>${pessoa.tipo}</strong></td>
-                        <td>${pessoa.nome}</td>
-                        <td>${rg}</td>
-                    </tr>
-                `;
-                corpoTabela.innerHTML += linha;
-            }
-
-            statusDiv.innerHTML = "<span style='color:green;'>Dados estruturados!</span>";
-            tabelaDiv.style.display = "block";
-        }
-    </script>
-</body>
-</html>
+            const padroes =
