@@ -3,15 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Leitor de PDF Offline</title>
-    <link rel="manifest" href="manifest.json">
-    <meta name="theme-color" content="#007bff">
+    <title>Extrator em Linhas Alinhadas</title>
     <style>
         body { 
             font-family: Arial, sans-serif; 
-            padding: 20px; 
+            padding: 15px; 
             background: #f0f0f0; 
-            max-width: 600px; 
+            max-width: 800px; 
             margin: 0 auto; 
         }
         .box { 
@@ -20,51 +18,94 @@
             border-radius: 8px; 
             box-shadow: 0 2px 4px rgba(0,0,0,0.1); 
             text-align: center; 
+            margin-bottom: 20px;
         }
         input[type="file"] { 
-            margin: 20px 0; 
+            margin: 15px 0; 
             padding: 10px;
             background: #e9e9e9;
             border-radius: 4px;
-            width: 80%;
-        }
-        #resultado { 
-            background: white; 
-            padding: 15px; 
-            border-radius: 8px; 
-            text-align: left; 
-            white-space: pre-wrap; 
-            max-height: 400px; 
-            overflow-y: auto; 
-            margin-top: 20px; 
-            font-size: 14px; 
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            width: 90%;
         }
         .status { 
             color: #666; 
             font-style: italic; 
             margin-top: 10px;
         }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            background: white;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-top: 20px;
+        }
+        th, td {
+            padding: 12px 15px;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+        }
+        th {
+            background-color: #0056b3;
+            color: white;
+            font-weight: bold;
+        }
+        tr:hover {
+            background-color: #f5f5f5;
+        }
+        .container-tabela {
+            overflow-x: auto;
+        }
+        #preview-texto {
+            background: #222;
+            color: #00ff00; /* Estilo terminal para facilitar leitura */
+            padding: 15px;
+            border-radius: 8px;
+            font-family: monospace;
+            font-size: 12px;
+            max-height: 300px;
+            overflow-y: auto;
+            margin-top: 20px;
+            white-space: pre-wrap;
+            text-align: left;
+        }
     </style>
 
-    <!-- Carrega a biblioteca PDF.js da Mozilla -->
+    <!-- Biblioteca PDF.js da Mozilla -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 </head>
 <body>
 
     <div class="box">
-        <h1>Conversor de PDF para Texto</h1>
-        <p>Clique abaixo para buscar o PDF no seu celular:</p>
+        <h1>Extrator Ordenado (Linhas Reais)</h1>
+        <p>Gera a tabela analisando exatamente as primeiras 50 linhas estruturadas:</p>
         
-        <!-- Botão universal simplificado para evitar abrir a câmera -->
         <input type="file" id="pdf-input">
         <div id="status" class="status"></div>
     </div>
 
-    <div id="resultado" style="display: none;"></div>
+    <!-- Tabela de Resultados -->
+    <div class="container-tabela" id="resultado-tabela" style="display: none;">
+        <table>
+            <thead>
+                <tr>
+                    <th>Tipo / Papel</th>
+                    <th>Nome Encontrado</th>
+                    <th>RG</th>
+                </tr>
+            </thead>
+            <tbody id="corpo-tabela"></tbody>
+        </table>
+    </div>
+
+    <!-- Preview para conferência -->
+    <div id="preview-container" style="display: none;">
+        <p style="margin-top:20px; font-weight:bold;">Linhas reais extraídas (Limite: 50):</p>
+        <div id="preview-texto"></div>
+    </div>
 
     <script>
-        // Configura o worker do PDF.js obrigatório para o funcionamento
         pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 
         document.getElementById('pdf-input').addEventListener('change', async (event) => {
@@ -72,45 +113,141 @@
             if (!file) return;
 
             const statusDiv = document.getElementById('status');
-            const resultadoDiv = document.getElementById('resultado');
+            const tabelaDiv = document.getElementById('resultado-tabela');
+            const corpoTabela = document.getElementById('corpo-tabela');
+            const previewContainer = document.getElementById('preview-container');
+            const previewTexto = document.getElementById('preview-texto');
             
-            statusDiv.innerText = "Processando PDF... aguarde.";
-            resultadoDiv.style.display = "none";
-            resultadoDiv.innerText = "";
+            statusDiv.innerText = "Reorganizando e alinhando linhas... aguarde.";
+            tabelaDiv.style.display = "none";
+            previewContainer.style.display = "none";
+            corpoTabela.innerHTML = ""; 
 
             try {
-                // Ler o arquivo do celular como ArrayBuffer
                 const fileReader = new FileReader();
                 fileReader.onload = async function () {
                     const typedarray = new Uint8Array(this.result);
-                    
-                    // Carrega o documento PDF
                     const pdf = await pdfjsLib.getDocument(typedarray).promise;
-                    let textoCompleto = "";
+                    
+                    const page = await pdf.getPage(1);
+                    const textContent = await page.getTextContent();
+                    
+                    // --- ALGORITMO DE ALINHAMENTO DE LINHAS REAIS ---
+                    let blocosDeTexto = [];
+                    
+                    textContent.items.forEach(item => {
+                        // item.transform[5] guarda a altura (Y) do texto na página
+                        // item.transform[4] guarda a posição horizontal (X)
+                        blocosDeTexto.push({
+                            texto: item.str,
+                            x: item.transform[4],
+                            y: Math.round(item.transform[5]) // Arredonda para agrupar na mesma linha
+                        });
+                    });
 
-                    // Passa por cada página do PDF extraindo o texto
-                    for (let i = 1; i <= pdf.numPages; i++) {
-                        const page = await pdf.getPage(i);
-                        const textContent = await page.getTextContent();
+                    // Agrupa os elementos que possuem a mesma altura (Y)
+                    let linhasAgrupadas = {};
+                    blocosDeTexto.forEach(bloco => {
+                        if (!linhasAgrupadas[bloco.y]) {
+                            linhasAgrupadas[bloco.y] = [];
+                        }
+                        linhasAgrupadas[bloco.y].push(bloco);
+                    });
+
+                    // Ordena as alturas de cima para baixo (no PDF, o Y maior fica no topo)
+                    let alturasOrdenadas = Object.keys(linhasAgrupadas).sort((a, b) => b - a);
+
+                    // Monta as linhas de texto finais ordenando da esquerda para a direita (X)
+                    let arrayLinhasFinais = [];
+                    alturasOrdenadas.forEach(y => {
+                        let pedacosDaLinha = linhasAgrupadas[y];
+                        // Ordena pelo X para ler na ordem correta da frase
+                        pedacosDaLinha.sort((a, b) => a.x - b.x);
                         
-                        // Junta as palavras da página
-                        const textoPagina = textContent.items.map(item => item.str).join(" ");
-                        textoCompleto += `--- Página ${i} ---\n${textoPagina}\n\n`;
-                    }
+                        let linhaCompleta = pedacosDaLinha.map(p => p.texto).join(" ").replace(/\s+/g, ' ');
+                        if (linhaCompleta.trim().length > 0) {
+                            arrayLinhasFinais.push(linhaCompleta);
+                        }
+                    });
 
-                    // Exibe o resultado na tela
-                    statusDiv.innerText = "Concluído com sucesso!";
-                    resultadoDiv.innerText = textoCompleto;
-                    resultadoDiv.style.display = "block";
+                    // --- RECORTE DAS 50 LINHAS REAIS ---
+                    const linhasLimitadas = arrayLinhasFinais.slice(0, 50);
+                    const textoFinalFiltrado = linhasLimitadas.join("\n");
+
+                    // Exibe o texto perfeitamente alinhado na caixinha verde
+                    previewTexto.innerText = textoFinalFiltrado;
+                    previewContainer.style.display = "block";
+
+                    // Executa a busca de dados nas linhas certas
+                    processarTextoEPreecherTabela(textoFinalFiltrado);
                 };
                 
                 fileReader.readAsArrayBuffer(file);
 
             } catch (erro) {
                 console.error(erro);
-                statusDiv.innerText = "Erro ao ler o PDF. Certifique-se de que não é uma imagem digitalizada.";
+                statusDiv.innerText = "Erro ao processar as linhas do arquivo.";
             }
         });
+
+        function processarTextoEPreecherTabela(texto) {
+            const statusDiv = document.getElementById('status');
+            const tabelaDiv = document.getElementById('resultado-tabela');
+            const corpoTabela = document.getElementById('corpo-tabela');
+
+            // Captura o nome/dado que vem após a palavra-chave até o fim da linha ou vírgula
+            const padroes = [
+                { tipo: 'Vítima', regex: /(?:vítima|vitima)[:\s-]([^,\n]{3,40})/gi },
+                { tipo: 'Testemunha', regex: /(?:testemunha)[:\s-]([^,\n]{3,40})/gi },
+                { tipo: 'Nome', regex: /(?:nome)[:\s-]([^,\n]{3,40})/gi }
+            ];
+
+            let dadosEncontrados = [];
+            let rgsEncontrados = [];
+
+            // Captura os RGs
+            let matchRG;
+            const regexRG = /(?:rg|r\.g\.)[:\s-]*([0-9X\s.-]{5,15})/gi;
+            while ((matchRG = regexRG.exec(texto)) !== null) {
+                rgsEncontrados.push(matchRG[1].trim());
+            }
+
+            // Captura as Pessoas
+            padroes.forEach(padrao => {
+                let match;
+                padrao.regex.lastIndex = 0; 
+                while ((match = padrao.regex.exec(texto)) !== null) {
+                    dadosEncontrados.push({
+                        tipo: padrao.tipo,
+                        nome: match[1].trim()
+                    });
+                }
+            });
+
+            if (dadosEncontrados.length === 0 && rgsEncontrados.length === 0) {
+                statusDiv.innerText = "Leitura concluída, mas nenhum dado coincidiu com as regras de busca.";
+                return;
+            }
+
+            const totalLinhas = Math.max(dadosEncontrados.length, rgsEncontrados.length);
+
+            for (let i = 0; i < totalLinhas; i++) {
+                const pessoa = dadosEncontrados[i] || { tipo: 'Não identificado', nome: '-' };
+                const rg = rgsEncontrados[i] || '-';
+
+                const linha = `
+                    <tr>
+                        <td><strong>${pessoa.tipo}</strong></td>
+                        <td>${pessoa.nome}</td>
+                        <td>${rg}</td>
+                    </tr>
+                `;
+                corpoTabela.innerHTML += linha;
+            }
+
+            statusDiv.innerText = "Tabela organizada com sucesso!";
+            tabelaDiv.style.display = "block";
+        }
     </script>
 </body>
 </html>
