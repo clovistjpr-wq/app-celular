@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Extrator PDF Estabilizado (30 a 60)</title>
+    <title>Extrator PDF Blindado (30 a 60)</title>
     <style>
         body { 
             font-family: Arial, sans-serif; 
@@ -47,7 +47,7 @@
             border-bottom: 1px solid #ddd;
         }
         th {
-            background-color: #721c24;
+            background-color: #007bff;
             color: white;
             font-weight: bold;
         }
@@ -77,11 +77,11 @@
 <body>
 
     <div class="box">
-        <h1>Extrator Filtrado Corrigido (30 a 60)</h1>
-        <p>Selecione o PDF para processamento em servidor estável:</p>
+        <h1>Extrator de PDF Autônomo</h1>
+        <p>Analisa as linhas 30 a 60 sem bloqueios de segurança:</p>
         
         <input type="file" id="pdf-input">
-        <div id="status" class="status">Aguardando arquivo...</div>
+        <div id="status" class="status">Carregando sistema...</div>
     </div>
 
     <div class="container-tabela" id="resultado-tabela" style="display: none;">
@@ -98,18 +98,24 @@
     </div>
 
     <div id="preview-container" style="display: none;">
-        <p style="margin-top:20px; font-weight:bold;">Linhas Extraídas (Intervalo 30 a 60):</p>
+        <p style="margin-top:20px; font-weight:bold;">Linhas Extraídas (30 a 60):</p>
         <div id="preview-texto"></div>
     </div>
 
     <script>
-        // Aponta o Worker para a mesma versão estável externa com segurança
+        // SOLUÇÃO DO BLOQUEIO: Criamos o Worker de forma embutida via código para o navegador não bloquear
         window.onload = function() {
             try {
-                pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';
-                document.getElementById('status').innerText = "Sistema pronto para uso.";
+                const workerCode = `
+                    importScripts('https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js');
+                `;
+                const blob = new Blob([workerCode], {type: 'application/javascript'});
+                pdfjsLib.GlobalWorkerOptions.workerSrc = URL.createObjectURL(blob);
+                document.getElementById('status').innerText = "Sistema pronto e desbloqueado!";
             } catch(e) {
-                document.getElementById('status').innerHTML = "<span style='color:red;'>Erro ao carregar os módulos de segurança do PDF. Atualize a página.</span>";
+                // Caso falhe, usa o método alternativo inline direto
+                pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';
+                document.getElementById('status').innerText = "Sistema pronto (modo de compatibilidade).";
             }
         };
 
@@ -123,7 +129,7 @@
             const previewContainer = document.getElementById('preview-container');
             const previewTexto = document.getElementById('preview-texto');
             
-            statusDiv.innerHTML = "<span style='color:#e67e22;'>Processando coordenadas e alinhando texto...</span>";
+            statusDiv.innerHTML = "<span style='color:#e67e22;'>Alinhando e processando linhas...</span>";
             tabelaDiv.style.display = "none";
             previewContainer.style.display = "none";
             corpoTabela.innerHTML = ""; 
@@ -133,8 +139,6 @@
                 fileReader.onload = async function () {
                     try {
                         const typedarray = new Uint8Array(this.result);
-                        
-                        // Método estável de carregamento
                         const loadingTask = pdfjsLib.getDocument({data: typedarray});
                         const pdf = await loadingTask.promise;
                         
@@ -172,7 +176,7 @@
                             }
                         });
 
-                        // Intervalo estrito: Linha 30 a 60
+                        // Intervalo: Linhas 30 a 60
                         const linhasFiltradas = arrayLinhasFinais.slice(29, 60);
                         const textoFinalFiltrado = linhasFiltradas.join("\n");
 
@@ -182,7 +186,7 @@
                         processarTextoEPreecherTabela(textoFinalFiltrado);
                     } catch (errInner) {
                         console.error(errInner);
-                        statusDiv.innerHTML = "<span style='color:red;'>Erro interno na leitura dos dados binários do PDF.</span>";
+                        statusDiv.innerHTML = "<span style='color:red;'>Erro ao descriptografar o PDF. Pode ser um arquivo digitalizado (imagem).</span>";
                     }
                 };
                 
@@ -190,7 +194,7 @@
 
             } catch (erro) {
                 console.error(erro);
-                statusDiv.innerHTML = "<span style='color:red;'>Falha de comunicação com o arquivo selecionado.</span>";
+                statusDiv.innerHTML = "<span style='color:red;'>Falha ao carregar arquivo.</span>";
             }
         });
 
@@ -226,7 +230,7 @@
             });
 
             if (dadosEncontrados.length === 0 && rgsEncontrados.length === 0) {
-                statusDiv.innerHTML = "<span style='color:#e67e22;'>Filtro aplicado, porém nenhum Nome/RG está entre as linhas 30 e 60.</span>";
+                statusDiv.innerHTML = "<span style='color:#e67e22;'>Leitura feita! Mas nenhum Nome ou RG consta entre as linhas 30 e 60.</span>";
                 return;
             }
 
@@ -246,7 +250,7 @@
                 corpoTabela.innerHTML += linha;
             }
 
-            statusDiv.innerHTML = "<span style='color:green;'>Tabela estruturada com sucesso!</span>";
+            statusDiv.innerHTML = "<span style='color:green;'>Dados estruturados!</span>";
             tabelaDiv.style.display = "block";
         }
     </script>
