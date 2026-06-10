@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Meu PWA Local</title>
+    <!-- Link para o Manifest -->
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#007bff">
+    <style>
+        body { font-family: Arial, sans-serif; text-align: center; padding-top: 50px; background: #f0f0f0; }
+        button { padding: 15px 30px; font-size: 18px; border-radius: 8px; border: none; background: #007bff; color: white; }
+    </style>
+</head>
+<body>
+
+    <h1>Meu Primeiro PWA</h1>
+    <p>Este app roda offline!</p>
+    <button onclick="alert('Funciona!')">Testar</button>
+
+    <script>
+        // Registra o Service Worker para permitir funcionamento offline
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('sw.js')
+                .then(() => console.log("Service Worker Registrado!"));
+        }
+    </script>
+</body>
+</html>
