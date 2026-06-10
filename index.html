@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Extrator PDF Contínuo (15 a 30)</title>
+    <title>Extrator PDF (Linhas 17 a 30)</title>
     <style>
         body { font-family: Arial, sans-serif; padding: 15px; background: #f0f0f0; max-width: 800px; margin: 0 auto; }
         .box { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); text-align: center; margin-bottom: 20px; }
@@ -21,10 +21,10 @@
 <body>
 
     <div class="box">
-        <h1>Extrator Contínuo (Sem Quebras)</h1>
-        <p>Dados das linhas 15 a 30 em texto contínuo:</p>
+        <h1>Extrator Contínuo (Linhas 17 a 30)</h1>
+        <p>Dados do intervalo solicitado em texto contínuo:</p>
         <input type="file" id="pdf-input">
-        <div id="status" class="status">Sistema pronto!</div>
+        <div id="status" class="status">Carregando motor...</div>
     </div>
 
     <div class="container-tabela" id="resultado-tabela" style="display: none;">
@@ -44,7 +44,12 @@
     <script>
         // Inicialização do Motor
         window.onload = function() {
-            pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';
+            try {
+                pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';
+                document.getElementById('status').innerText = "Sistema pronto! Selecione o arquivo.";
+            } catch(e) {
+                document.getElementById('status').innerText = "Sistema pronto.";
+            }
         };
 
         document.getElementById('pdf-input').addEventListener('change', async (event) => {
@@ -85,8 +90,8 @@
                         return linhasAgrupadas[y].sort((a, b) => a.x - b.x).map(p => p.texto).join(" ");
                     });
 
-                    // --- MÁGICA: JUNTA TUDO COM ESPAÇO, NUNCA COM QUEBRA ---
-                    const linhasFiltradas = arrayLinhasFinais.slice(14, 30);
+                    // --- AJUSTE: CORTE DAS LINHAS 17 A 30 ---
+                    const linhasFiltradas = arrayLinhasFinais.slice(16, 30);
                     const textoFinalFiltrado = linhasFiltradas.join(" "); 
 
                     previewTexto.innerText = textoFinalFiltrado;
@@ -102,8 +107,6 @@
 
         function processarTextoEPreecherTabela(texto) {
             const corpoTabela = document.getElementById('corpo-tabela');
-            
-            // Regex ajustada para buscar nomes ignorando quebras de linha
             const padroes = [
                 { tipo: 'Vítima', regex: /(?:vítima|vitima)[:\s-]([^,]{3,40})/gi },
                 { tipo: 'Testemunha', regex: /(?:testemunha)[:\s-]([^,]{3,40})/gi },
@@ -113,7 +116,6 @@
             let dadosEncontrados = [];
             let rgsEncontrados = [];
 
-            // Captura RGs (agora sem se preocupar com \n)
             let matchRG;
             const regexRG = /(?:rg|r\.g\.)[:\s-]*([0-9X\s.-]{5,15})/gi;
             while ((matchRG = regexRG.exec(texto)) !== null) {
@@ -128,7 +130,7 @@
             });
 
             if (dadosEncontrados.length === 0 && rgsEncontrados.length === 0) {
-                document.getElementById('status').innerText = "Nenhum dado encontrado.";
+                document.getElementById('status').innerText = "Nenhum dado encontrado nesse intervalo.";
                 return;
             }
 
